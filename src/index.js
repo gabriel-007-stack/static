@@ -1,79 +1,85 @@
 import { createClient } from "@supabase/supabase-js";
 import express from "express";
-
-import x from 'dotenv';
+import dotenv from 'dotenv';
+import fs from 'fs/promises';
 import sharp from "sharp";
-x.config();
+import path from "path";
+import { fileURLToPath } from "url";
+
+dotenv.config();
+const imageCache = new Map();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-async function render() {
-    return await supabase
-    .storage
-    .from('public/thumbnails')
-    .download('404.png');
+const resolutions = {
+    max: { width: 1920, height: 1080 },
+    normal: { width: 720, height: 1280 },
+    small: { width: 640, height: 480 },
+    verysmall: { width: 320, height: 240 },
+    default: { width: 168, height: 94 }
+};
+
+async function render(res, cacheKey) {
+    const imagePath = path.join(__dirname, '404.png');
+    try {
+        const data = await fs.readFile(imagePath);
+        res.setHeader('Content-Type', 'image/png');
+        cacheKey && res.set(cacheKey, data);
+        res.send(data);
+        
+    } catch {
+        res.status(404).end();
+    }
 }
 
-
-app.get('/favicon.ico', async (_, res) => { res.end() })
+app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
 
-app.get('/t/:id/:type', async (req, res) => {
+app.get('/t/:id/:type.png', async (req, res) => {
     const { id, type } = req.params;
-
-    const resolutions = {
-        max: { width: 1920, height: 1080 },
-        normal: { width: 720, height: 1280 },
-        small: { width: 640, height: 480 },
-        verysmall: { width: 320, height: 240 }
+    const typeParts = /(\d{3,4})x(\d{3,4})/.exec(type);
+    const size = resolutions[type] || {
+        width: Math.min(typeParts?.[1] || 2560, 2560),
+        height: Math.min(typeParts?.[2] || 1440, 1440)
     };
-    const type_ = /([\d]{3,4})x([\d]{3,4})/.test(type) || type.split("x")
-    const size = resolutions[type] || { width: type_[0] && Math.min(type_[0], 2560) || 2560, height: type_[1] && Math.min(type_[1], 2560) || 1440 };
 
+    const cacheKey = `${id}-${size.width}x${size.height}.png`;
+
+    res.setHeader('Cache-Control', 'public, max-age=36000');
+    if (imageCache.has(cacheKey)) {
+        return res.send(imageCache.get(cacheKey));
+    }
+    
     try {
+        const downloadStart = Date.now();
         const { data, error } = await supabase
             .storage
             .from('thumbnail')
-            .download(id + '.png');
+            .download(`${id}.png`);
 
         if (error || !data) {
-            const file = await render()
-
-            const ff = new File([file.data], "");
-            res.setHeader('content-length', file.data.size)
-            res.setHeader('Content-Type', file.data.type)
-            res.send(Buffer.from(await ff.arrayBuffer()))
-            return;
+            return render(res, cacheKey);
         }
 
-        const imageBuffer = data;
-        let image = sharp(imageBuffer);
-
-        // Resize image
-        image = image.resize(size.width, size.height).png();
-        const transformedImage = await image.toBuffer();
+        const resizeStart = Date.now();
+        const imageBuffer = await sharp(data).resize(size.width, size.height).png().toBuffer();
         res.setHeader('Content-Type', 'image/png');
-        res.send(transformedImage);
-    } catch (error) {
-        res.end()
+        res.send(imageBuffer);
+        res.set(cacheKey, imageBuffer);
+    } catch {
+        res.status(500).end();
     }
-})
-
+});
 
 app.get('*', async (req, res) => {
-    const file = await render();
-    if (file.error) {
-        res.end()
-    }
-    const ff = new File([file.data], "");
-    res.setHeader('content-length', file.data.size)
-    res.setHeader('Content-Type', file.data.type)
     res.setHeader('Cache-Control', 'public, max-age=36000');
-    res.send(Buffer.from(await ff.arrayBuffer()))
-})
+    await render(res);
+});
 
 app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
