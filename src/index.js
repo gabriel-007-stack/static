@@ -4,7 +4,9 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
+import blobToBuffer from "blob-to-buffer";
 import { fileURLToPath } from "url";
+import { log } from "console";
 
 dotenv.config();
 const imageCache = new Map();
@@ -32,7 +34,7 @@ async function render(res, cacheKey) {
         res.setHeader('Content-Type', 'image/png');
         cacheKey && res.set(cacheKey, data);
         res.send(data);
-        
+
     } catch {
         res.status(404).end();
     }
@@ -55,16 +57,19 @@ app.get('/t/:id/:type.png', async (req, res) => {
     if (imageCache.has(cacheKey)) {
         return res.send(imageCache.get(cacheKey));
     }
-    
+
     try {
         const downloadStart = Date.now();
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .storage
-            .from('thumbnail')
+            .from('public/thumbnail')
             .download(`${id}.png`);
 
         if (error || !data) {
-            return render(res, cacheKey);
+            data = (await supabase
+                .storage
+                .from('public/thumbnail')
+                .download(`404.png`)).data;
         }
 
         const resizeStart = Date.now();
@@ -76,6 +81,45 @@ app.get('/t/:id/:type.png', async (req, res) => {
         res.status(500).end();
     }
 });
+// type = "BANNER" | "PROFILE"
+// /u/:token => {id}|{type}|..
+app.get('/u/:token', async (req, res) => {
+    const { token } = req.params;
+    try {
+        const [id, type, local, size_scale = 1] = atob(token).split("|")
+        if ("BANNER" === type) {
+            let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`banner.png`);
+            if (error) {
+                res.status(403).end();
+                return
+            }
+            const buffer = await blobToBufferAsync(data);
+
+            res.setHeader('Content-Type', 'image/png');
+            const width = 1920
+            const height = 1080
+            if (local === "TY") {
+                res.setHeader('Cache-Control', 'public, max-age=36000');
+                res.send(buffer);
+            } else if (local === "PC") {
+                res.setHeader('Cache-Control', 'public, max-age=36000');
+                const left = 0
+                const top = Math.floor(width * 0.21875);
+                res.send(await sharp(buffer).extract({ left, top, width, height: height - top * 2 }).jpeg().toBuffer());
+            } else {
+                const left = Math.floor(width * 0.3);
+                const top = Math.floor(width * 0.21875);
+                res.send(await sharp(buffer).extract({ left, top, width, height: height - top * 2 }).jpeg().toBuffer());
+            }
+        }
+
+        res.status(200).end();
+    } catch (a) {
+        console.error(a);
+
+        res.status(404).end();
+    }
+});
 
 app.get('*', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=36000');
@@ -83,3 +127,7 @@ app.get('*', async (req, res) => {
 });
 
 app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+const blobToBufferAsync = async (blob) => {
+    const arrayBuffer = await blob.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+};
