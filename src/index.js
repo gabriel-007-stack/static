@@ -4,9 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
-import blobToBuffer from "blob-to-buffer";
-import { fileURLToPath } from "url";
-import { log } from "console";
+import { fileURLToPath } from "url";;
 
 dotenv.config();
 const imageCache = new Map();
@@ -27,13 +25,13 @@ const resolutions = {
     default: { width: 168, height: 94 }
 };
 
+const imagePath404 = path.join(__dirname, '404.png');
 async function render(res, cacheKey) {
-    const imagePath = path.join(__dirname, '404.png');
     try {
-        const data = await fs.readFile(imagePath);
+        const data =(await fs.readFile(imagePath404))
         res.setHeader('Content-Type', 'image/png');
         cacheKey && res.set(cacheKey, data);
-        res.send(data);
+        res.status(200).send(data);
 
     } catch {
         res.status(404).end();
@@ -46,38 +44,32 @@ app.get('/ping', (_, res) => res.sendStatus(204));
 app.get('/t/:id/:type.png', async (req, res) => {
     const { id, type } = req.params;
     const typeParts = /(\d{3,4})x(\d{3,4})/.exec(type);
-    const size = resolutions[type] || {
+    const { width, height } = resolutions[type] || {
         width: Math.min(typeParts?.[1] || 2560, 2560),
-        height: Math.min(typeParts?.[2] || 1440, 1440)
+        height: Math.min(typeParts?.[2] || 2560, 2560)
     };
 
-    const cacheKey = `${id}-${size.width}x${size.height}.png`;
-
+    const cacheKey = `${id}-${width}x${height}.png`;
     res.setHeader('Cache-Control', 'public, max-age=36000');
     if (imageCache.has(cacheKey)) {
         return res.send(imageCache.get(cacheKey));
     }
 
     try {
-        const downloadStart = Date.now();
+        res.setHeader('Content-Type', 'image/png');
         let { data, error } = await supabase
             .storage
             .from('public/thumbnail')
-            .download(`${id}.png`);
+            .download(`${id}.png`, { transform: { width, height, quality: 80, resize: "contain" } });
 
         if (error || !data) {
-            data = (await supabase
-                .storage
-                .from('public/thumbnail')
-                .download(`404.png`)).data;
+            await render(res);
+            return;
         }
-
-        const resizeStart = Date.now();
-        const imageBuffer = await sharp(data).resize(size.width, size.height).png().toBuffer();
-        res.setHeader('Content-Type', 'image/png');
-        res.send(imageBuffer);
-        res.set(cacheKey, imageBuffer);
-    } catch {
+        const buffer = await blobToBufferAsync(data);
+        res.status(200).send(buffer);
+        res.set(cacheKey, buffer);
+    } catch (x) {
         res.status(500).end();
     }
 });
@@ -115,8 +107,6 @@ app.get('/u/:token', async (req, res) => {
 
         res.status(200).end();
     } catch (a) {
-        console.error(a);
-
         res.status(404).end();
     }
 });
