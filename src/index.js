@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
-import { fileURLToPath } from "url";;
+import { fileURLToPath } from "url"; import { log } from "console";
+;
 
 dotenv.config();
 const imageCache = new Map();
@@ -28,7 +29,7 @@ const resolutions = {
 const imagePath404 = path.join(__dirname, '404.png');
 async function render(res, cacheKey) {
     try {
-        const data =(await fs.readFile(imagePath404))
+        const data = (await fs.readFile(imagePath404))
         res.setHeader('Content-Type', 'image/png');
         cacheKey && res.set(cacheKey, data);
         res.status(200).send(data);
@@ -50,7 +51,8 @@ app.get('/t/:id/:type.png', async (req, res) => {
     };
 
     const cacheKey = `${id}-${width}x${height}.png`;
-    res.setHeader('Cache-Control', 'public, max-age=36000');
+    res.setHeader('Cache-Control', 'public, max-age=0');
+    //res.setHeader('Cache-Control', 'public, max-age=36000');
     if (imageCache.has(cacheKey)) {
         return res.send(imageCache.get(cacheKey));
     }
@@ -59,14 +61,14 @@ app.get('/t/:id/:type.png', async (req, res) => {
         res.setHeader('Content-Type', 'image/png');
         let { data, error } = await supabase
             .storage
-            .from('public/thumbnail')
-            .download(`${id}.png`, { transform: { width, height, quality: 80, resize: "contain" } });
+            .from('public/thumbnails')
+            .download(`${encodeURIComponent(id)}.png`);
 
         if (error || !data) {
             await render(res);
             return;
         }
-        const buffer = await blobToBufferAsync(data);
+        const buffer = await sharp(await blobToBufferAsync(data)).resize({ width, height, fit: "contain", background: "#000" }).jpeg().toBuffer();
         res.status(200).send(buffer);
         res.set(cacheKey, buffer);
     } catch (x) {
