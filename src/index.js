@@ -20,7 +20,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const resolutions = {
     max: { width: 1920, height: 1080 },
     normal: { width: 720, height: 1280 },
-    small: { width: 640, height: 480 },
+    small: { width: 640, height: 360 },
     verysmall: { width: 320, height: 240 },
     default: { width: 168, height: 94 }
 };
@@ -60,7 +60,7 @@ app.get('/t/:id/:type.png', async (req, res) => {
         let { data, error } = await supabase
             .storage
             .from('public/thumbnail')
-            .download(`${id}.png`, { transform: { width, height, quality: 100, resize: "contain" } });
+            .download(`${id}.png`, { transform: { width, height, quality: 80, resize: "contain" } });
 
         if (error || !data) {
             await render(res);
