@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -59,14 +59,14 @@ app.get('/t/:id/:type.png', async (req, res) => {
         res.setHeader('Content-Type', 'image/png');
         let { data, error } = await supabase
             .storage
-            .from('public/thumbnail')
-            .download(`${id}.png`, { transform: { width, height, quality: 80, resize: "contain" } });
+            .from('public/thumbnails')
+            .download(`${id}.png`);
 
         if (error || !data) {
             await render(res);
             return;
         }
-        const buffer = await blobToBufferAsync(data);
+        const buffer = await sharp(await blobToBufferAsync(data)).resize({ width, height, fit: "contain", background: "#000" }).jpeg().toBuffer();
         res.status(200).send(buffer);
         res.set(cacheKey, buffer);
     } catch (x) {
