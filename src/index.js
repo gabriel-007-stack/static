@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
-import { fileURLToPath } from "url";;
-
+import { fileURLToPath } from "url";import compression from "compression";
+;
 dotenv.config();
 const imageCache = new Map();
 
@@ -38,6 +38,17 @@ async function render(res, cacheKey) {
     }
 }
 
+app.use(compression({
+    level: 2,
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) {
+        return false;
+      }
+      return compression.filter(req, res);
+    }
+  }));
+  
 app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
 
