@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
-import { fileURLToPath } from "url";import compression from "compression";
+import { fileURLToPath } from "url"; import compression from "compression";
 ;
 dotenv.config();
 const imageCache = new Map();
@@ -42,13 +42,13 @@ app.use(compression({
     level: 2,
     threshold: 1024,
     filter: (req, res) => {
-      if (req.headers['x-no-compression']) {
-        return false;
-      }
-      return compression.filter(req, res);
+        if (req.headers['x-no-compression']) {
+            return false;
+        }
+        return compression.filter(req, res);
     }
-  }));
-  
+}));
+
 app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
 
@@ -67,7 +67,7 @@ app.get('/t/:id/:type.png', async (req, res) => {
     }
 
     try {
-        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Type', 'image/jpeg');
         let { data, error } = await supabase
             .storage
             .from('public/thumbnails')
@@ -77,7 +77,8 @@ app.get('/t/:id/:type.png', async (req, res) => {
             await render(res);
             return;
         }
-        const buffer = await sharp(await blobToBufferAsync(data)).resize({ width, height, fit: "contain", background: "#000" }).jpeg().toBuffer();
+        const buff = await blobToBufferAsync(data)
+        const buffer = await processImage(buff, width, height)
         res.status(200).send(buffer);
         res.set(cacheKey, buffer);
     } catch (x) {
@@ -132,3 +133,17 @@ const blobToBufferAsync = async (blob) => {
     const arrayBuffer = await blob.arrayBuffer();
     return Buffer.from(arrayBuffer);
 };
+
+
+async function processImage(buff, width, height) {
+    const resizedImage = await sharp(buff)
+        .resize({ width, height, fastShrinkOnLoad: true, fit: "contain", kernel: "cubic" })
+        .jpeg({ quality: Math.floor(ramdom(40, 40)), })
+        .toBuffer()
+    return resizedImage
+}
+
+
+const ramdom = (start = 0, le = 1) => {
+    return start + Math.random() * le
+}
