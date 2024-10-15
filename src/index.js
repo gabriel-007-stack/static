@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url"; import compression from "compression";
+import { createCanvas, loadImage } from "canvas";
 ;
 dotenv.config();
 const imageCache = new Map();
@@ -51,6 +52,54 @@ app.use(compression({
 
 app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
+
+
+
+app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
+    const { id, type = "M3" } = req.params;
+    const { sq, sig } = req.query;
+    try {
+        let [prov, quality = 75] = atob(sq).split("|")
+        
+
+        quality = +quality
+        quality = isNaN(quality) ? 75 : quality
+        quality = Math.floor(quality) / 100
+
+        const countThumbnails = Number(prov);
+
+
+        let [_, indexStart, _type, gridCount] = type.match(/(\d{1,2})\_(M|I)(\d)/)
+        if (_type == "M" && !isNaN(countThumbnails)) {
+
+            gridCount = Math.max(1, +gridCount)
+            gridCount = Math.min(4, gridCount)
+
+            indexStart = +indexStart
+
+            const image = await loadImage("https://vqcmhpqxreafcjylrznn.supabase.co/storage/v1/object/public/thumbnails/storyboard/n4nOHUPLkEyR.jpg")
+            const aspact = image.naturalHeight / (image.naturalWidth / countThumbnails)
+            const width = 120 / aspact;
+            const canvas = createCanvas(width * gridCount, 120 * gridCount)
+            const ctx = canvas.getContext('2d');
+            for (let index = 0; index < gridCount; index++) {
+                const ps = index % gridCount
+                ctx.drawImage(image, (-indexStart - index * gridCount) * width, ps * 120)
+            }
+            const buffer = canvas.toBuffer("image/jpeg", { quality });
+            res.set('Cache-Control', 'public, max-age=36000');
+            res.set('Content-Type', 'image/jpeg');
+            res.send(buffer);
+        } else {
+
+            next()
+        }
+    } catch (error) {
+        next()
+    }
+});
+
+
 
 app.get('/t/:id/:type.png', async (req, res) => {
     const { id, type } = req.params;
