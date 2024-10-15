@@ -75,7 +75,7 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
             gridCount = Math.max(1, +gridCount)
             gridCount = Math.min(4, gridCount)
 
-            indexStart = +indexStart
+            indexStart = +indexStart * (gridCount * gridCount)
 
             const image = await loadImage("https://vqcmhpqxreafcjylrznn.supabase.co/storage/v1/object/public/thumbnails/storyboard/n4nOHUPLkEyR.jpg")
             const aspact = image.naturalHeight / (image.naturalWidth / countThumbnails)
