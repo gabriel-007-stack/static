@@ -17,6 +17,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const static_url = "https://vqcmhpqxreafcjylrznn.supabase.co/storage/v1/object/public"
 
 const resolutions = {
     max: { width: 1920, height: 1080 },
@@ -60,7 +61,7 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
     const { sq, sig } = req.query;
     try {
         let [prov, quality = 75] = atob(sq).split("|")
-        
+
 
         quality = +quality
         quality = isNaN(quality) ? 75 : quality
@@ -77,7 +78,7 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
 
             indexStart = +indexStart * (gridCount * gridCount)
 
-            const image = await loadImage("https://vqcmhpqxreafcjylrznn.supabase.co/storage/v1/object/public/thumbnails/storyboard/n4nOHUPLkEyR.jpg")
+            const image = await loadImage(static_url + "/thumbnails/storyboard/n4nOHUPLkEyR.jpg")
             const aspact = image.naturalHeight / (image.naturalWidth / countThumbnails)
             const width = 120 / aspact;
             const canvas = createCanvas(width * gridCount, 120 * gridCount)
@@ -110,30 +111,32 @@ app.get('/t/:id/:type.png', async (req, res) => {
     };
 
     const cacheKey = `${id}-${width}x${height}.png`;
-    res.setHeader('Cache-Control', 'public, max-age=36000');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     if (imageCache.has(cacheKey)) {
         return res.send(imageCache.get(cacheKey));
     }
 
     try {
         res.setHeader('Content-Type', 'image/jpeg');
-        let { data, error } = await supabase
-            .storage
-            .from('public/thumbnails')
-            .download(`${id}.png`);
-
-        if (error || !data) {
-            await render(res);
-            return;
+        const image = await loadImage(static_url + `/thumbnails/${id}.png`)
+        const canvas = createCanvas(width, height)
+        const ctx = canvas.getContext('2d');
+        const aspact = image.naturalHeight / image.naturalWidth
+        if (image.naturalHeight > image.naturalWidth) {
+            ctx.drawImage(image, 0, -image.naturalWidth / 2, width, height * aspact)
+            ctx.fillStyle = "#000a"
+            ctx.fillRect(0, 0, width, height)
         }
-        const buff = await blobToBufferAsync(data)
-        const buffer = await processImage(buff, width, height)
-        res.status(200).send(buffer);
-        res.set(cacheKey, buffer);
+        const { left, top } = centralizaContain(image.naturalWidth, image.naturalHeight, width, height)
+        ctx.drawImage(image, left, top, width - left * 2, height - top * 2)
+        const buffer = canvas.toBuffer("image/jpeg");
+        res.send(buffer);
+
     } catch (x) {
         res.status(500).end();
     }
 });
+//git add .;git commit -m "🎉 - 0.1.8";git push
 // type = "BANNER" | "PROFILE"
 // /u/:token => {id}|{type}|..
 app.get('/u/:token', async (req, res) => {
@@ -195,4 +198,24 @@ async function processImage(buff, width, height) {
 
 const ramdom = (start = 0, le = 1) => {
     return start + Math.random() * le
+}
+
+function centralizaContain(
+    widthContent,
+    heightContent,
+    widthBox,
+    heightBox
+) {
+    // Calcula a proporção do conteúdo em relação à caixa
+    const scale = Math.min(widthBox / widthContent, heightBox / heightContent);
+
+    // Calcula as dimensões redimensionadas do conteúdo
+    const scaledWidth = widthContent * scale;
+    const scaledHeight = heightContent * scale;
+
+    // Centraliza o conteúdo na caixa
+    const left = (widthBox - scaledWidth) / 2;
+    const top = (heightBox - scaledHeight) / 2;
+
+    return { left, top };
 }
