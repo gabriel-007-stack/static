@@ -123,7 +123,7 @@ app.get('/t/:id/:type.png', async (req, res) => {
         const ctx = canvas.getContext('2d');
         const aspact = image.naturalHeight / image.naturalWidth
         if (image.naturalHeight > image.naturalWidth) {
-            ctx.drawImage(image, 0, -image.naturalWidth / 2, width, height * aspact)
+            ctx.drawImage(image, 0, -width / 2, width, height * aspact)
             ctx.fillStyle = "#000a"
             ctx.fillRect(0, 0, width, height)
         }
