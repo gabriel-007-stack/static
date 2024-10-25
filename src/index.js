@@ -189,7 +189,6 @@ app.get('/u/:token', async (req, res) => {
 app.post('/upv/:id/:type', async (req, res) => {
     let { id, type } = req.params;
 
-    // Verificação de tipo e ID
     if (!(typeUpload.includes(type) && id.length > 4)) {
         res.status(403).send({ bed: true });
         return;
@@ -229,7 +228,8 @@ app.post('/upv/:id/:type', async (req, res) => {
 });
 
 app.get('*', async (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=36000');
+    res.status(404)
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     await render(res);
 });
 
