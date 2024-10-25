@@ -181,12 +181,13 @@ app.get('/u/:token', async (req, res) => {
  * id \ videoId or channelId
  */
 app.post('/upv/:id/:type', async (req, res) => {
-    const { id, type } = req.params;
+    let { id, type } = req.params;
     const body = req
     if (!(typeUpload.includes(type) && id.length > 4)) {
         res.status(403).send({ bed: true })
         return
     }
+    type = type.toUpperCase()
     let url = "public/"
     const key = {
         VIDEO: "thumbnails",
