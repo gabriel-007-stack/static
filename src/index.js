@@ -53,7 +53,7 @@ app.use(compression({
 
 app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
-
+const typeUpload = ['VIDEO', 'PROFILE', 'BANNER']
 
 
 app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
@@ -173,6 +173,45 @@ app.get('/u/:token', async (req, res) => {
     } catch (a) {
         res.status(404).end();
     }
+});
+app.post(express.text());
+/**
+ * upload private
+ * type 'VIDEO' | 'PROFILE' | 'BANNER'
+ * id \ videoId or channelId
+ */
+app.post('/upv/:id/:type', async (req, res) => {
+    const { id, type } = req.params;
+    const body = req
+    if (!(typeUpload.includes(type) && id.length > 4)) {
+        res.status(403).send({ bed: true })
+        return
+    }
+    let url = "public/"
+    const key = {
+        VIDEO: "thumbnails",
+        PROFILE: "profile_image",
+        BANNER: "profile_image"
+    }
+    url += id
+    if (key[type] === "profile_image") {
+        url += "/"
+        if (key === "BANNER") {
+            url += "banner"
+        } else {
+            url += "profile"
+        }
+    }
+    const file = (new TextEncoder).encode(body);
+    const { data, error } = await supabase
+        .storage
+        .from(key[type])
+        .upload(url + ".png", file, {
+            cacheControl: '36000',
+            upsert: false,
+            contentType: req.headers["content-type"]
+        })
+        res.send(data)
 });
 
 app.get('*', async (req, res) => {
