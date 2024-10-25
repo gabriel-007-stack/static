@@ -174,7 +174,7 @@ app.get('/u/:token', async (req, res) => {
         res.status(404).end();
     }
 });
-app.post(express.text());
+
 /**
  * upload private
  * type 'VIDEO' | 'PROFILE' | 'BANNER'
