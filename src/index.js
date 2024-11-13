@@ -6,6 +6,8 @@ import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url"; import compression from "compression";
 import { createCanvas, loadImage } from "canvas";
+import { exiftool } from "exiftool-vendored";
+import { Readable } from "stream";
 ;
 dotenv.config();
 const imageCache = new Map();
@@ -21,8 +23,10 @@ const static_url = "https://vqcmhpqxreafcjylrznn.supabase.co/storage/v1/object/p
 
 const resolutions = {
     max: { width: 1920, height: 1080 },
+    maxreel: { width: 1080, height: 1920 },
     normal: { width: 720, height: 1280 },
     small: { width: 640, height: 360 },
+    smallreel: { width: 360, height: 640 },
     verysmall: { width: 320, height: 240 },
     default: { width: 168, height: 94 }
 };
@@ -71,6 +75,7 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
 
 
         let [_, indexStart, _type, gridCount] = type.match(/(\d{1,2})\_(M|I)(\d)/)
+        const image = await loadImage(static_url + "/thumbnails/storyboard/" + id + ".jpg")
         if (_type == "M" && !isNaN(countThumbnails)) {
 
             gridCount = Math.max(1, +gridCount)
@@ -78,7 +83,6 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
 
             indexStart = +indexStart * (gridCount * gridCount)
 
-            const image = await loadImage(static_url + "/thumbnails/storyboard/n4nOHUPLkEyR.jpg")
             const aspact = image.naturalHeight / (image.naturalWidth / countThumbnails)
             const width = 120 / aspact;
             const canvas = createCanvas(width * gridCount, 120 * gridCount)
@@ -92,10 +96,11 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
             res.set('Content-Type', 'image/jpeg');
             res.send(buffer);
         } else {
-
             next()
         }
     } catch (error) {
+        console.log(error);
+
         next()
     }
 });
@@ -138,11 +143,11 @@ app.get('/t/:id/:type.png', async (req, res) => {
 });
 //git add .;git commit -m "🎉 - 0.1.8";git push
 // type = "BANNER" | "PROFILE"
-// /u/:token => {id}|{type}|..
-app.get('/u/:token', async (req, res) => {
-    const { token } = req.params;
+// /u/:data => b64({id}|{type}|{quelity}|{size})
+app.get('/u/:data', async (req, res) => {
+    const { data } = req.params;
     try {
-        const [id, type, local, size_scale = 1] = atob(token).split("|")
+        const [id, type, local, size_scale = 1, size = 120] = atob(data).split("|")
         if ("BANNER" === type) {
             let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`banner.png`);
             if (error) {
@@ -167,6 +172,15 @@ app.get('/u/:token', async (req, res) => {
                 const top = Math.floor(width * 0.21875);
                 res.send(await sharp(buffer).extract({ left, top, width, height: height - top * 2 }).jpeg().toBuffer());
             }
+        } else {
+            const size_ = +size
+            res.setHeader('Cache-Control', 'public, max-age=36000');
+            if (isNaN(size_)) {
+                return next()
+            }
+            let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`profile.png`);
+            res.setHeader('Content-Type', 'image/png');
+            res.send(await sharp(buffer).extract({ width: size_, height: size_ }).jpeg().toBuffer());
         }
 
         res.status(200).end();
@@ -180,13 +194,13 @@ app.get('/u/:token', async (req, res) => {
  * type 'VIDEO' | 'PROFILE' | 'BANNER'
  * id \ videoId or channelId
  */
- 
+
 /**
- * upload private
+ * upload private v6
  * type 'VIDEO' | 'PROFILE' | 'BANNER'
  * id \ videoId or channelId
  */
-app.post('/upv/:id/:type', async (req, res) => {
+app.post('/upv6/:id/:type', async (req, res) => {
     let { id, type } = req.params;
 
     if (!(typeUpload.includes(type) && id.length > 4)) {
@@ -210,15 +224,20 @@ app.post('/upv/:id/:type', async (req, res) => {
     const chunks = [];
     req.on("data", chunk => chunks.push(chunk));
     req.on("end", async () => {
-        const file = Buffer.concat(chunks);
+        const buffer = Buffer.concat(chunks);
+        const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+
+        const blob = new Blob([arrayBuffer]);
+
+        const files = removeMetadataFromBlob(blob)
         const { data, error } = await supabase.storage
             .from(key[type])
-            .upload(url + ".png", file, {
+            .upload(url + ".png", files, {
                 cacheControl: '36000',
                 upsert: false,
                 contentType: req.headers["content-type"]
             });
-        
+
         if (error) {
             res.status(500).send({ error });
         } else {
@@ -271,4 +290,24 @@ function centralizaContain(
     const top = (heightBox - scaledHeight) / 2;
 
     return { left, top };
+}
+async function removeMetadataFromBlob(blob) {
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const readableStream = Readable.from(buffer);
+
+        const result = await exiftool.read(readableStream);
+
+        await exiftool.write(readableStream, { all: '' });
+
+        return Buffer.from(result);
+
+    } catch (error) {
+        console.error('Erro ao remover metadados:', error);
+        throw error;
+    } finally {
+        await exiftool.end();
+    }
 }
