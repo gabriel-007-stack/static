@@ -44,16 +44,6 @@ async function render(res, cacheKey) {
     }
 }
 
-app.use(compression({
-    level: 2,
-    threshold: 1024,
-    filter: (req, res) => {
-        if (req.headers['x-no-compression']) {
-            return false;
-        }
-        return compression.filter(req, res);
-    }
-}));
 
 app.get('/favicon.ico', (_, res) => res.end());
 app.get('/ping', (_, res) => res.sendStatus(204));
@@ -64,6 +54,7 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
     const { id, type = "M3" } = req.params;
     const { sq, sig } = req.query;
     try {
+        res.setHeader('Cache-Control', 'public, max-age=21600');
         let [prov, quality = 75] = atob(sq).split("|")
 
 
@@ -92,7 +83,6 @@ app.get('/storyboard/:id/:type.jpg', async (req, res, next) => {
                 ctx.drawImage(image, (-indexStart - index * gridCount) * width, ps * 120)
             }
             const buffer = canvas.toBuffer("image/jpeg", { quality });
-            res.set('Cache-Control', 'public, max-age=36000');
             res.set('Content-Type', 'image/jpeg');
             res.send(buffer);
         } else {
@@ -114,9 +104,10 @@ app.get('/t/:id/:type.png', async (req, res) => {
         width: Math.min(typeParts?.[1] || 2560, 2560),
         height: Math.min(typeParts?.[2] || 2560, 2560)
     };
+    res.setHeader('Cache-Control', 'public, max-age=7200');
+
 
     const cacheKey = `${id}-${width}x${height}.png`;
-    res.setHeader('Cache-Control', 'public, max-age=3600');
     if (imageCache.has(cacheKey)) {
         return res.send(imageCache.get(cacheKey));
     }
@@ -147,6 +138,7 @@ app.get('/t/:id/:type.png', async (req, res) => {
 app.get('/u/:data', async (req, res) => {
     const { data } = req.params;
     try {
+        res.setHeader('Cache-Control', 'public, max-age=86400, no-transform');
         const [id, type, local, size_scale = 1, size = 120] = atob(data).split("|")
         if ("BANNER" === type) {
             let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`banner.png`);
@@ -160,10 +152,8 @@ app.get('/u/:data', async (req, res) => {
             const width = 1920
             const height = 1080
             if (local === "TY") {
-                res.setHeader('Cache-Control', 'public, max-age=36000');
                 res.send(buffer);
             } else if (local === "PC") {
-                res.setHeader('Cache-Control', 'public, max-age=36000');
                 const left = 0
                 const top = Math.floor(width * 0.21875);
                 res.send(await sharp(buffer).extract({ left, top, width, height: height - top * 2 }).jpeg().toBuffer());
@@ -174,7 +164,6 @@ app.get('/u/:data', async (req, res) => {
             }
         } else {
             const size_ = +size
-            res.setHeader('Cache-Control', 'public, max-age=36000');
             if (isNaN(size_)) {
                 return next()
             }
