@@ -8,6 +8,7 @@ import { fileURLToPath } from "url"; import compression from "compression";
 import { createCanvas, loadImage } from "canvas";
 import { exiftool } from "exiftool-vendored";
 import { Readable } from "stream";
+import { ExiftoolProcess } from "node-exiftool";
 ;
 dotenv.config();
 const imageCache = new Map();
@@ -283,10 +284,12 @@ function centralizaContain(
     const top = (heightBox - scaledHeight) / 2;
 
     return { left, top };
-}async function removeMetadataFromBlob(buffer) {
+}
+const ep = new ExiftoolProcess();
+async function removeMetadataFromBlob(buffer) {
     try {
         await ep.open();
-        const tempFilePath = `./temp/${Date.now()}_${Math.floor(Math.random() * 1000)}.png`;
+        const tempFilePath = `./temp/${Date.now()}_${Math.floor(Math.random() * 90000)}.png`;
         require('fs').writeFileSync(tempFilePath, buffer);
 
         await ep.writeMetadata(tempFilePath, { all: '' }, ['overwrite_original']);
