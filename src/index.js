@@ -217,7 +217,7 @@ app.post('/upv6/:id/:type', async (req, res) => {
         try {
             const buffer = Buffer.concat(chunks);
 
-            const cleanBuffer = await removeMetadataFromBlob(buffer);
+            const cleanBuffer = await removeMetadataFromImage(buffer);
 
             const { data, error } = await supabase.storage
                 .from(key[type])
