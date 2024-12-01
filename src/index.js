@@ -215,15 +215,16 @@ app.post('/upv6/:id/:type', async (req, res) => {
     req.on("end", async () => {
         const buffer = Buffer.concat(chunks);
         const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-
+        
         const blob = new Blob([arrayBuffer]);
-
+        
         const files = removeMetadataFromBlob(blob)
+        const arrayBuffer3 = (await files).buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
         const { data, error } = await supabase.storage
             .from(key[type])
-            .upload(url + ".png", files, {
+            .upload(url + ".png",arrayBuffer3, {
                 cacheControl: '36000',
-                upsert: false,
+                upsert: false, metadata: { ch: id },
                 contentType: req.headers["content-type"]
             });
 
