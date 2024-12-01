@@ -6,9 +6,6 @@ import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url"; import compression from "compression";
 import { createCanvas, loadImage } from "canvas";
-import { exiftool } from "exiftool-vendored";
-import { Readable } from "stream";
-import { ExiftoolProcess } from "node-exiftool";
 ;
 dotenv.config();
 const imageCache = new Map();
@@ -225,10 +222,12 @@ app.post('/upv6/:id/:type', async (req, res) => {
                     cacheControl: '36000',
                     upsert: false,
                     metadata: { ch: id },
-                    contentType: req.headers["content-type"] || 'image/png'
+                    contentType: 'image/png'
                 });
 
             if (error) {
+                console.log(error);
+                
                 res.status(500).send({ error });
             } else {
                 res.send(data);
