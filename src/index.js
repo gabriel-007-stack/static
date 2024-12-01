@@ -285,24 +285,8 @@ function centralizaContain(
 
     return { left, top };
 }
-const ep = new ExiftoolProcess();
-async function removeMetadataFromBlob(buffer) {
-    try {
-        await ep.open();
-        const tempFilePath = `./temp/${Date.now()}_${Math.floor(Math.random() * 90000)}.png`;
-        require('fs').writeFileSync(tempFilePath, buffer);
-
-        await ep.writeMetadata(tempFilePath, { all: '' }, ['overwrite_original']);
-r
-        const cleanBuffer = require('fs').readFileSync(tempFilePath);
-
-        require('fs').unlinkSync(tempFilePath);
-
-        return cleanBuffer;
-    } catch (error) {
-        console.error('Erro ao remover metadados:', error);
-        throw error;
-    } finally {
-        await ep.close();
-    }
+async function removeMetadataFromImage(buffer) {
+    return await sharp(buffer)
+        .withMetadata(false)
+        .toBuffer();
 }
