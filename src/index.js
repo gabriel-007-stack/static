@@ -213,25 +213,28 @@ app.post('/upv6/:id/:type', async (req, res) => {
     const chunks = [];
     req.on("data", chunk => chunks.push(chunk));
     req.on("end", async () => {
-        const buffer = Buffer.concat(chunks);
-        const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-        
-        const blob = new Blob([arrayBuffer]);
-        
-        const files = removeMetadataFromBlob(blob)
-        const arrayBuffer3 = (await files).buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-        const { data, error } = await supabase.storage
-            .from(key[type])
-            .upload(url + ".png",arrayBuffer3, {
-                cacheControl: '36000',
-                upsert: false, metadata: { ch: id },
-                contentType: req.headers["content-type"]
-            });
+        try {
+            const buffer = Buffer.concat(chunks);
 
-        if (error) {
-            res.status(500).send({ error });
-        } else {
-            res.send(data);
+            const cleanBuffer = await removeMetadataFromBlob(buffer);
+
+            const { data, error } = await supabase.storage
+                .from(key[type])
+                .upload(url + ".png", cleanBuffer, {
+                    cacheControl: '36000',
+                    upsert: false,
+                    metadata: { ch: id },
+                    contentType: req.headers["content-type"] || 'image/png'
+                });
+
+            if (error) {
+                res.status(500).send({ error });
+            } else {
+                res.send(data);
+            }
+        } catch (error) {
+            console.error('Erro durante o upload:', error);
+            res.status(500).send({ error: error.message });
         }
     });
 });
@@ -280,24 +283,23 @@ function centralizaContain(
     const top = (heightBox - scaledHeight) / 2;
 
     return { left, top };
-}
-async function removeMetadataFromBlob(blob) {
+}async function removeMetadataFromBlob(buffer) {
     try {
-        const arrayBuffer = await blob.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        await ep.open();
+        const tempFilePath = `./temp/${Date.now()}_${Math.floor(Math.random() * 1000)}.png`;
+        require('fs').writeFileSync(tempFilePath, buffer);
 
-        const readableStream = Readable.from(buffer);
+        await ep.writeMetadata(tempFilePath, { all: '' }, ['overwrite_original']);
+r
+        const cleanBuffer = require('fs').readFileSync(tempFilePath);
 
-        const result = await exiftool.read(readableStream);
+        require('fs').unlinkSync(tempFilePath);
 
-        await exiftool.write(readableStream, { all: '' });
-
-        return Buffer.from(result);
-
+        return cleanBuffer;
     } catch (error) {
         console.error('Erro ao remover metadados:', error);
         throw error;
     } finally {
-        await exiftool.end();
+        await ep.close();
     }
 }
