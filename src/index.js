@@ -134,11 +134,11 @@ app.get('/t/:id/:type.png', async (req, res) => {
 // type = "BANNER" | "PROFILE"
 // /u/:data => b64({id}|{type}|{quelity}|{size})
 app.get('/u/:data', async (req, res) => {
-    const { data:z } = req.params;
+    const { data: z } = req.params;
     try {
         res.setHeader('Cache-Control', 'public, max-age=86400, no-transform');
         const [id, type, local, size_scale = 1, size = 120] = atob(z).split("|")
-        let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download("BANNER" === type? `banner.png`: "profile.png");
+        let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download("BANNER" === type ? `banner.png` : "profile.png");
         if ("BANNER" === type) {
             if (error) {
                 res.status(403).end();
@@ -167,10 +167,8 @@ app.get('/u/:data', async (req, res) => {
             }
             res.setHeader('Content-Type', 'image/png');
             const buffer = await blobToBufferAsync(data);
-            res.send(await sharp(buffer).extract({ width: size_, height: size_ }).jpeg().toBuffer());
+            res.send(await sharp(buffer).extract({ width: size_, height: size_, left: 0, top: 0 }).jpeg().toBuffer());
         }
-
-        res.status(200).end();
     } catch (a) {
         console.log(a)
         res.status(404).end();
@@ -228,7 +226,7 @@ app.post('/upv6/:id/:type', async (req, res) => {
 
             if (error) {
                 console.log(error);
-                
+
                 res.status(500).send({ error });
             } else {
                 res.send(data);
