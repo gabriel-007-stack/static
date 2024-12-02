@@ -167,7 +167,7 @@ app.get('/u/:data', async (req, res) => {
             }
             res.setHeader('Content-Type', 'image/png');
             const buffer = await blobToBufferAsync(data);
-            res.send(await sharp(buffer).extract({ width: size_, height: size_, left: 0, top: 0 }).jpeg().toBuffer());
+            res.send(await sharp(buffer).resize({width:size_,height:size_}).jpeg().toBuffer());
         }
     } catch (a) {
         console.log(a)
