@@ -138,8 +138,8 @@ app.get('/u/:data', async (req, res) => {
     try {
         res.setHeader('Cache-Control', 'public, max-age=86400, no-transform');
         const [id, type, local, size_scale = 1, size = 120] = atob(data).split("|")
+        let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download("BANNER" === type? `banner.png`: "profile.png");
         if ("BANNER" === type) {
-            let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`banner.png`);
             if (error) {
                 res.status(403).end();
                 return
@@ -165,8 +165,8 @@ app.get('/u/:data', async (req, res) => {
             if (isNaN(size_)) {
                 return next()
             }
-            let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download(`profile.png`);
             res.setHeader('Content-Type', 'image/png');
+            const buffer = await blobToBufferAsync(data);
             res.send(await sharp(buffer).extract({ width: size_, height: size_ }).jpeg().toBuffer());
         }
 
