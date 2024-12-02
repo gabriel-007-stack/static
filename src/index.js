@@ -172,6 +172,7 @@ app.get('/u/:data', async (req, res) => {
 
         res.status(200).end();
     } catch (a) {
+        console.log(a)
         res.status(404).end();
     }
 });
