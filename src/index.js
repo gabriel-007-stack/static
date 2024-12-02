@@ -134,10 +134,10 @@ app.get('/t/:id/:type.png', async (req, res) => {
 // type = "BANNER" | "PROFILE"
 // /u/:data => b64({id}|{type}|{quelity}|{size})
 app.get('/u/:data', async (req, res) => {
-    const { data } = req.params;
+    const { data:z } = req.params;
     try {
         res.setHeader('Cache-Control', 'public, max-age=86400, no-transform');
-        const [id, type, local, size_scale = 1, size = 120] = atob(data).split("|")
+        const [id, type, local, size_scale = 1, size = 120] = atob(z).split("|")
         let { data, error } = await supabase.storage.from(`public/profile_image/${id}`).download("BANNER" === type? `banner.png`: "profile.png");
         if ("BANNER" === type) {
             if (error) {
