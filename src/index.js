@@ -196,7 +196,7 @@ app.post('/upv6/:id/:type', async (req, res) => {
     }
 
     type = type.toUpperCase();
-    let url = "public/";
+    let url = "";
     const key = {
         VIDEO: "thumbnails",
         PROFILE: "profile_image",
